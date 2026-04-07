@@ -59,7 +59,13 @@ def load_all_configs() -> list[dict]:
 
 
 def clone_or_update(config: dict, repos_dir: Path | None = None) -> Path:
-    """Clone or update a repository for benchmarking."""
+    """Clone or update a repository for benchmarking.
+
+    NETWORK CALL — git clone / git fetch (HTTPS, GitHub)
+    Triggered only by `code-review-graph eval`. No user source-code is transmitted;
+    this call downloads public open-source repositories defined in
+    code_review_graph/eval/configs/*.yaml. See docs/network-calls.md §5 for details.
+    """
     repos_dir = repos_dir or DEFAULT_REPOS
     repos_dir.mkdir(parents=True, exist_ok=True)
     repo_path = repos_dir / config["name"]

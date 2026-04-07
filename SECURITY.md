@@ -46,9 +46,18 @@ code-review-graph is a **local development tool**. It:
 
 ### Optional Network Calls
 
-- **Google Gemini embeddings**: Only when explicitly configured with `provider="google"` and `GOOGLE_API_KEY` env var
-- **Local embeddings model download**: One-time download from HuggingFace on first use of `sentence-transformers`
-- **D3.js CDN**: Visualization HTML loads D3.js v7 from `d3js.org` (with SRI verification)
+All outbound network calls are disabled by default.  A full description of every call — including
+the exact data transmitted — is in [`docs/network-calls.md`](docs/network-calls.md).
+
+| Call | Condition | Data sent |
+|------|-----------|-----------|
+| Google Gemini embeddings | `provider="google"` + `GOOGLE_API_KEY` env var | Symbol names, signatures, return types (no source bodies) |
+| MiniMax embeddings | `provider="minimax"` + `MINIMAX_API_KEY` env var | Symbol names, signatures, return types (no source bodies) |
+| HuggingFace model download | `[embeddings]` extra installed, first run | None (model weights only) |
+| D3.js CDN | User opens `graph.html` in browser | None |
+| Eval git clone | `code-review-graph eval` command | None (reads public repos) |
+
+Source-code bodies are **never** transmitted to any remote service.
 
 ## Security Scanning
 

@@ -9,3 +9,4 @@
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) -- Common issues and fixes (including Windows/WSL)
 - [ROADMAP.md](ROADMAP.md) -- Shipped and planned features
 - [LEGAL.md](LEGAL.md) -- License and privacy
+- [network-calls.md](network-calls.md) -- All outbound network calls and data transmitted

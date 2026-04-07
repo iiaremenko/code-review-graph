@@ -62,6 +62,12 @@ class LocalEmbeddingProvider(EmbeddingProvider):
         if self._model is None:
             try:
                 from sentence_transformers import SentenceTransformer
+                # NETWORK CALL (one-time) — HuggingFace Hub (HTTPS GET)
+                # Downloads model weights for self._model_name on first use.
+                # Default model: all-MiniLM-L6-v2 (configurable via CRG_EMBEDDING_MODEL).
+                # No user data is sent; this is a standard package download.
+                # Subsequent runs use the locally cached weights.
+                # See docs/network-calls.md §3 for details.
                 self._model = SentenceTransformer(
                     self._model_name,
                     trust_remote_code=True,
@@ -106,6 +112,13 @@ class GoogleEmbeddingProvider(EmbeddingProvider):
             )
 
     def embed(self, texts: list[str]) -> list[list[float]]:
+        # NETWORK CALL — Google Generative AI (HTTPS)
+        # Sends up to 100 symbol-text strings per request (name + kind + params +
+        # return type + language; no source-code bodies).
+        # Payload: {"model": self.model, "contents": [<text>, ...],
+        #            "config": {"task_type": "RETRIEVAL_DOCUMENT"}}
+        # Auth: GOOGLE_API_KEY (set by the google-genai SDK internally).
+        # See docs/network-calls.md §1 for details.
         batch_size = 100
         results = []
         for i in range(0, len(texts), batch_size):
@@ -140,6 +153,11 @@ class GoogleEmbeddingProvider(EmbeddingProvider):
                 time.sleep(wait)
 
     def embed_query(self, text: str) -> list[float]:
+        # NETWORK CALL — Google Generative AI (HTTPS)
+        # Sends a single query string (user-supplied search term, not source code).
+        # Payload: {"model": self.model, "contents": [<text>],
+        #            "config": {"task_type": "RETRIEVAL_QUERY"}}
+        # Auth: GOOGLE_API_KEY.  See docs/network-calls.md §1 for details.
         response = self._call_with_retry(
             lambda: self._client.models.embed_content(
                 model=self.model,
@@ -179,6 +197,14 @@ class MiniMaxEmbeddingProvider(EmbeddingProvider):
         self._api_key = api_key
 
     def _call_api(self, texts: list[str], task_type: str) -> list[list[float]]:
+        # NETWORK CALL — MiniMax Embeddings API (HTTPS POST)
+        # Endpoint: https://api.minimax.io/v1/embeddings
+        # Sends up to 100 symbol-text strings per call (name + kind + params +
+        # return type + language; no source-code bodies).
+        # Payload: {"model": "embo-01", "texts": [<text>, ...], "type": <task_type>}
+        #   task_type = "db" for indexing, "query" for search queries.
+        # Auth: Authorization: Bearer <MINIMAX_API_KEY>
+        # See docs/network-calls.md §2 for details.
         import json as _json
         import urllib.request
 
