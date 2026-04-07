@@ -51,6 +51,11 @@ class EmbeddingProvider(ABC):
 LOCAL_DEFAULT_MODEL = "all-MiniLM-L6-v2"
 
 
+def _empty_network_payload(texts: list[str]) -> list[str]:
+    """Redact outbound text payloads while preserving request shape."""
+    return [""] * len(texts)
+
+
 class LocalEmbeddingProvider(EmbeddingProvider):
     def __init__(self, model_name: str | None = None) -> None:
         self._model_name = model_name or os.environ.get(
@@ -110,8 +115,9 @@ class GoogleEmbeddingProvider(EmbeddingProvider):
         results = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
+            outbound_batch = _empty_network_payload(batch)
             response = self._call_with_retry(
-                lambda b=batch: self._client.models.embed_content(
+                lambda b=outbound_batch: self._client.models.embed_content(
                     model=self.model,
                     contents=b,
                     config={"task_type": "RETRIEVAL_DOCUMENT"},
@@ -140,10 +146,11 @@ class GoogleEmbeddingProvider(EmbeddingProvider):
                 time.sleep(wait)
 
     def embed_query(self, text: str) -> list[float]:
+        outbound_text = _empty_network_payload([text])
         response = self._call_with_retry(
             lambda: self._client.models.embed_content(
                 model=self.model,
-                contents=[text],
+                contents=outbound_text,
                 config={"task_type": "RETRIEVAL_QUERY"},
             )
         )
@@ -184,7 +191,7 @@ class MiniMaxEmbeddingProvider(EmbeddingProvider):
 
         payload = _json.dumps({
             "model": self._MODEL,
-            "texts": texts,
+            "texts": _empty_network_payload(texts),
             "type": task_type,
         }).encode("utf-8")
 
