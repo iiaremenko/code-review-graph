@@ -2,6 +2,8 @@
 
 import json
 import os
+import sys
+import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,6 +11,7 @@ import pytest
 from code_review_graph.embeddings import (
     LOCAL_DEFAULT_MODEL,
     EmbeddingStore,
+    GoogleEmbeddingProvider,
     LocalEmbeddingProvider,
     MiniMaxEmbeddingProvider,
     _cosine_similarity,
@@ -233,6 +236,7 @@ class TestMiniMaxEmbeddingProvider:
         payload = json.loads(req.data.decode("utf-8"))
         assert payload["type"] == "db"
         assert payload["model"] == "embo-01"
+        assert payload["texts"] == ["", ""]
 
     def test_embed_query_calls_api_with_query_type(self):
         provider = MiniMaxEmbeddingProvider(api_key="test-key")
@@ -256,6 +260,7 @@ class TestMiniMaxEmbeddingProvider:
         req = call_args[0][0]
         payload = json.loads(req.data.decode("utf-8"))
         assert payload["type"] == "query"
+        assert payload["texts"] == [""]
 
     def test_embed_api_error_raises(self):
         provider = MiniMaxEmbeddingProvider(api_key="test-key")
@@ -287,3 +292,45 @@ class TestGetProviderMiniMax:
         with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(ValueError, match="MINIMAX_API_KEY"):
                 get_provider("minimax")
+
+
+class TestGoogleEmbeddingProvider:
+    def test_embed_sends_empty_document_payloads(self):
+        mock_client = MagicMock()
+        mock_client.models.embed_content.return_value = types.SimpleNamespace(
+            embeddings=[types.SimpleNamespace(values=[0.1, 0.2])]
+        )
+        fake_genai = types.SimpleNamespace(Client=MagicMock(return_value=mock_client))
+        fake_google = types.ModuleType("google")
+        fake_google.genai = fake_genai
+
+        with patch.dict(sys.modules, {"google": fake_google}, clear=False):
+            provider = GoogleEmbeddingProvider(api_key="test-key")
+            result = provider.embed(["secret source"])
+
+        assert result == [[0.1, 0.2]]
+        mock_client.models.embed_content.assert_called_once_with(
+            model="gemini-embedding-001",
+            contents=[""],
+            config={"task_type": "RETRIEVAL_DOCUMENT"},
+        )
+
+    def test_embed_query_sends_empty_query_payload(self):
+        mock_client = MagicMock()
+        mock_client.models.embed_content.return_value = types.SimpleNamespace(
+            embeddings=[types.SimpleNamespace(values=[0.5, 0.6])]
+        )
+        fake_genai = types.SimpleNamespace(Client=MagicMock(return_value=mock_client))
+        fake_google = types.ModuleType("google")
+        fake_google.genai = fake_genai
+
+        with patch.dict(sys.modules, {"google": fake_google}, clear=False):
+            provider = GoogleEmbeddingProvider(api_key="test-key")
+            result = provider.embed_query("sensitive query")
+
+        assert result == [0.5, 0.6]
+        mock_client.models.embed_content.assert_called_once_with(
+            model="gemini-embedding-001",
+            contents=[""],
+            config={"task_type": "RETRIEVAL_QUERY"},
+        )
